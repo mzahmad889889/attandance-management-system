@@ -1,59 +1,55 @@
 "use client";
 
+import React from 'react';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell
+    RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, Legend
 } from 'recharts';
+import { Factory } from 'lucide-react';
 import { PLANT_STATS } from '@/lib/mock-data';
 
-const COLORS = ['#f97316', '#3b82f6', '#10b981', '#f59e0b'];
+interface PlantChartProps {
+    data?: { plant: string; total: number; active_now: number; capacity: number }[];
+}
 
-export function PlantChart() {
+const COLORS = ['#f97316', '#60a5fa', '#34d399', '#a78bfa'];
+
+export function PlantChart({ data }: PlantChartProps) {
+    const chartData = data && data.length > 0
+        ? data.map((p, i) => ({ name: p.plant, workers: p.total, fill: COLORS[i % COLORS.length] }))
+        : PLANT_STATS.map((p, i) => ({ ...p, fill: COLORS[i % COLORS.length] }));
+
     return (
-        <div className="glass-card p-6 rounded-2xl h-[400px]">
-            <div className="flex justify-between items-center mb-6">
+        <div className="glass-card p-6 rounded-2xl">
+            <div className="flex items-center justify-between mb-6">
                 <div>
                     <h3 className="text-lg font-bold">Plant Distribution</h3>
-                    <p className="text-sm text-muted-foreground">Workers active across plants</p>
+                    <p className="text-xs text-muted-foreground">Workers per plant</p>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
+                    <Factory className="h-5 w-5" />
                 </div>
             </div>
-
-            <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={PLANT_STATS}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                        <XAxis
-                            dataKey="name"
-                            stroke="#ffffff50"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <YAxis
-                            stroke="#ffffff50"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <Tooltip
-                            cursor={{ fill: '#ffffff05' }}
-                            contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                            itemStyle={{ color: '#fff' }}
-                        />
-                        <Bar dataKey="workers" radius={[8, 8, 0, 0]}>
-                            {PLANT_STATS.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+                <RadialBarChart
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="30%"
+                    outerRadius="90%"
+                    barSize={14}
+                    data={chartData}
+                >
+                    <RadialBar
+                        background={{ fill: 'rgba(255,255,255,0.03)' }}
+                        dataKey="workers"
+                        cornerRadius={6}
+                        label={{ position: 'insideStart', fill: '#fff', fontSize: 10 }}
+                    />
+                    <Tooltip
+                        contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+                </RadialBarChart>
+            </ResponsiveContainer>
         </div>
     );
 }

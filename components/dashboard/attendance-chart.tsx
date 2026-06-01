@@ -1,68 +1,44 @@
 "use client";
 
+import React from 'react';
 import {
-    AreaChart,
-    Area,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 import { ATTENDANCE_STATS } from '@/lib/mock-data';
 
-export function AttendanceChart() {
-    return (
-        <div className="glass-card p-6 rounded-2xl h-[400px]">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h3 className="text-lg font-bold">Attendance Analytics</h3>
-                    <p className="text-sm text-muted-foreground">Weekly attendance trends</p>
-                </div>
-                <select className="bg-white/5 border border-white/10 rounded-lg text-xs p-2 outline-none">
-                    <option>Last 7 Days</option>
-                    <option>Last 30 Days</option>
-                </select>
-            </div>
+interface AttendanceChartProps {
+    data?: { date?: string; day: string; present: number; absent: number }[];
+}
 
-            <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={ATTENDANCE_STATS}>
-                        <defs>
-                            <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                        <XAxis
-                            dataKey="name"
-                            stroke="#ffffff50"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <YAxis
-                            stroke="#ffffff50"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                            itemStyle={{ color: '#fff' }}
-                        />
-                        <Area
-                            type="monotone"
-                            dataKey="present"
-                            stroke="#f97316"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorPresent)"
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
+export function AttendanceChart({ data }: AttendanceChartProps) {
+    const chartData = data && data.length > 0 ? data : ATTENDANCE_STATS;
+
+    return (
+        <div className="glass-card p-6 rounded-2xl">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h3 className="text-lg font-bold">Weekly Attendance</h3>
+                    <p className="text-xs text-muted-foreground">Last 7 days overview</p>
+                </div>
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <TrendingUp className="h-5 w-5" />
+                </div>
             </div>
+            <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={chartData} barSize={12} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                        contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: 12 }}
+                        labelStyle={{ color: '#94a3b8' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="present" name="Present" fill="#f97316" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="absent" name="Absent" fill="rgba(255,255,255,0.1)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+            </ResponsiveContainer>
         </div>
     );
 }

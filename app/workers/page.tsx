@@ -1,36 +1,78 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Search,
-    UserPlus,
-    Filter,
-    MoreHorizontal,
-    Mail,
-    Phone,
-    Shield
+    Search, UserPlus, Filter, Trash2, RefreshCw, Tag, MapPin
 } from 'lucide-react';
-import { MOCK_WORKERS } from '@/lib/mock-data';
+import { workersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { AddWorkerModal } from '@/components/workers/add-worker-modal';
 
 export default function WorkersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [workers, setWorkers] = useState(MOCK_WORKERS);
+    const [workers, setWorkers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [plantFilter, setPlantFilter] = useState('');
+    const [shiftFilter, setShiftFilter] = useState('');
+    const [meta, setMeta] = useState<{ plants: any[]; contractors: any[] }>({ plants: [], contractors: [] });
 
-    const filteredWorkers = workers.filter(w =>
-        w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        w.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const fetchWorkers = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res: any = await workersApi.list({
+                page,
+                per_page: 24,
+                search: searchTerm,
+                plant_id: plantFilter,
+                shift: shiftFilter,
+            });
+            setWorkers(res.workers || []);
+            setTotalPages(res.pages || 1);
+            setTotal(res.total || 0);
+        } catch {
+            // fallback silently
+        } finally {
+            setLoading(false);
+        }
+    }, [page, searchTerm, plantFilter, shiftFilter]);
 
-    const handleAddWorker = (newWorker: any) => {
-        const worker = {
-            ...newWorker,
-            status: 'Absent',
-            liveStatus: 'OUT',
-        };
-        setWorkers([worker, ...workers]);
+    useEffect(() => {
+        workersApi.meta().then((m: any) => setMeta(m)).catch(() => { });
+    }, []);
+
+    useEffect(() => {
+        const t = setTimeout(fetchWorkers, 300);
+        return () => clearTimeout(t);
+    }, [fetchWorkers]);
+
+    const handleAddWorker = async (newWorker: any) => {
+        try {
+            const res = await workersApi.create(newWorker);
+            fetchWorkers();
+            return res; // Important: return the result so modal gets worker ID
+        } catch (e: any) {
+            throw e; // Modal handles the error UI
+        }
+    };
+
+    const handleDeleteWorker = async (id: number) => {
+        if (!confirm('Are you sure you want to deactivate this worker?')) return;
+        try {
+            await workersApi.delete(id);
+            fetchWorkers();
+        } catch (e: any) {
+            alert(e.message || 'Failed to delete worker');
+        }
+    };
+
+    const shiftColor = (s: string) => {
+        if (s === 'Day') return 'text-amber-500 bg-amber-500/10';
+        if (s === 'Night') return 'text-indigo-400 bg-indigo-500/10';
+        return 'text-slate-400 bg-white/5';
     };
 
     return (
@@ -39,11 +81,15 @@ export default function WorkersPage() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onAdd={handleAddWorker}
+                meta={meta}
             />
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">Worker Directory</h2>
-                    <p className="text-muted-foreground">Manage and monitor all personnel in the ecosystem</p>
+                    <p className="text-muted-foreground">
+                        {total} workers registered across {meta.plants.length || 4} plants
+                    </p>
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
@@ -53,79 +99,150 @@ export default function WorkersPage() {
                 </button>
             </div>
 
+            {/* Filters */}
             <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row gap-4">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <input
                         type="text"
-                        placeholder="Search by worker name, ID or contractor..."
+                        placeholder="Search by name or worker code..."
                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 outline-none focus:ring-2 ring-primary/30 text-sm"
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                     />
                 </div>
                 <div className="flex gap-2">
-                    <button className="px-4 py-2 border border-white/10 rounded-xl bg-white/5 text-sm font-bold flex items-center gap-2">
-                        <Filter className="h-4 w-4" /> Filters
+                    <select
+                        value={plantFilter}
+                        onChange={e => { setPlantFilter(e.target.value); setPage(1); }}
+                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
+                    >
+                        <option value="">All Plants</option>
+                        {meta.plants.map((p: any) => (
+                            <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={shiftFilter}
+                        onChange={e => { setShiftFilter(e.target.value); setPage(1); }}
+                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
+                    >
+                        <option value="">All Shifts</option>
+                        <option value="Day" className="bg-slate-900">Day</option>
+                        <option value="Night" className="bg-slate-900">Night</option>
+                        <option value="Rest" className="bg-slate-900">Rest</option>
+                    </select>
+                    <button onClick={fetchWorkers} className="p-2 border border-white/10 rounded-xl bg-white/5 hover:bg-white/10">
+                        <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredWorkers.slice(0, 24).map((worker) => (
-                    <div key={worker.id} className="glass-card p-6 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group">
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="relative">
-                                <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all">
-                                    <img src={worker.photo || `https://i.pravatar.cc/150?u=${worker.id}`} alt={worker.name} />
+            {/* Grid */}
+            {loading && workers.length === 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="glass-card p-6 rounded-[2rem] h-64 animate-pulse bg-white/5" />
+                    ))}
+                </div>
+            ) : workers.length === 0 ? (
+                <div className="text-center py-24 text-muted-foreground">
+                    <UserPlus className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p className="font-bold">No workers found</p>
+                    <p className="text-sm mt-1">Add workers or connect the backend</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {workers.map((worker: any) => (
+                        <div key={worker.id} className="glass-card p-6 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group">
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="relative">
+                                    <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all bg-white/5 flex items-center justify-center">
+                                        {worker.photo_url ? (
+                                            <img
+                                                src={`http://localhost:5000${worker.photo_url}`}
+                                                alt={worker.name}
+                                                className="h-full w-full object-cover"
+                                                onError={(e: any) => { e.target.style.display = 'none'; }}
+                                            />
+                                        ) : (
+                                            <span className="text-2xl font-bold text-primary/50">{worker.name?.charAt(0)}</span>
+                                        )}
+                                    </div>
+                                    <span className={cn(
+                                        "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-slate-900",
+                                        worker.live_status === 'IN' ? "bg-green-500" : "bg-slate-600"
+                                    )} />
                                 </div>
-                                <span className={cn(
-                                    "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-slate-900",
-                                    worker.status === 'Present' ? "bg-green-500" : "bg-red-500"
-                                )} />
+                                <button
+                                    onClick={() => handleDeleteWorker(worker.id)}
+                                    className="p-2 hover:bg-red-500/10 rounded-full group/del transition-colors text-muted-foreground hover:text-red-500"
+                                    title="Delete Worker"
+                                >
+                                    <Trash2 className="h-5 w-5" />
+                                </button>
                             </div>
-                            <button className="p-2 hover:bg-white/5 rounded-full">
-                                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-                            </button>
+
+                            <h3 className="font-bold text-lg mb-0.5 truncate">{worker.name}</h3>
+                            <p className="text-primary font-mono text-xs font-bold tracking-widest mb-4">{worker.worker_code}</p>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between text-xs font-medium">
+                                    <span className="text-muted-foreground flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" /> Plant
+                                    </span>
+                                    <span className="text-white truncate max-w-[110px]">{worker.plant_name}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs font-medium">
+                                    <span className="text-muted-foreground">Contractor</span>
+                                    <span className="text-white truncate max-w-[100px]">{worker.contractor_name}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs font-medium">
+                                    <span className="text-muted-foreground">Shift</span>
+                                    <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold", shiftColor(worker.shift_type))}>
+                                        {worker.shift_type?.toUpperCase()}
+                                    </span>
+                                </div>
+                                {worker.live_status === 'IN' && worker.checkin_time && (
+                                    <div className="flex items-center justify-between text-xs font-medium">
+                                        <span className="text-muted-foreground">Checked In</span>
+                                        <span className="text-green-500 font-mono font-bold">{worker.checkin_time}</span>
+                                    </div>
+                                )}
+                                {!worker.has_face && (
+                                    <div className="flex items-center gap-1.5 text-[10px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg">
+                                        <Tag className="h-3 w-3" />
+                                        No face registered
+                                    </div>
+                                )}
+                            </div>
                         </div>
+                    ))}
+                </div>
+            )}
 
-                        <h3 className="font-bold text-lg mb-0.5">{worker.name}</h3>
-                        <p className="text-primary font-mono text-xs font-bold tracking-widest mb-4">{worker.id}</p>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between text-xs font-medium">
-                                <span className="text-muted-foreground">Department:</span>
-                                <span className="text-white">{worker.plantId}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs font-medium">
-                                <span className="text-muted-foreground">Contractor:</span>
-                                <span className="text-white truncate max-w-[100px]">{worker.contractor}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs font-medium">
-                                <span className="text-muted-foreground">Shift Plan:</span>
-                                <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-bold">
-                                    {worker.shiftType.toUpperCase()}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mt-6">
-                            <button className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                            </button>
-                            <button className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="flex justify-center pt-8">
-                <button className="px-8 py-3 rounded-2xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all">
-                    Load More Workers...
-                </button>
-            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-center gap-2">
+                    <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm disabled:opacity-40"
+                    >
+                        Previous
+                    </button>
+                    <span className="px-4 py-2 text-sm text-muted-foreground">
+                        Page {page} of {totalPages} ({total} workers)
+                    </span>
+                    <button
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

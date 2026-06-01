@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/layout/app-shell";
+import { AuthProvider } from "@/lib/auth-context";
+import { AppShellWrapper } from "@/components/layout/app-shell";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Industrial Attendance & Shift Management",
-  description: "Modern enterprise-level workforce management system",
+  description: "Enterprise-level AI-powered workforce attendance management system for 320+ industrial workers",
 };
 
 export default function RootLayout({
@@ -18,9 +19,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} antialiased`}>
-        <AppShell>
-          {children}
-        </AppShell>
+        <AuthProvider>
+          <AppShellWrapper>
+            {children}
+          </AppShellWrapper>
+        </AuthProvider>
       </body>
     </html>
   );
