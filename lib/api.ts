@@ -5,6 +5,9 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+/** Backend server origin (BASE_URL without the trailing /api) — for images and other static routes. */
+export const SERVER_URL = (BASE_URL || '').replace(/\/api\/?$/, '');
+
 function getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('ams_token');

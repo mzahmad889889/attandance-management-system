@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Search, UserPlus, Filter, Trash2, RefreshCw, Tag, MapPin, Edit2
 } from 'lucide-react';
-import { workersApi } from '@/lib/api';
+import { workersApi, SERVER_URL } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { AddWorkerModal } from '@/components/workers/add-worker-modal';
 
@@ -173,7 +173,7 @@ export default function WorkersPage() {
                                     <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all bg-white/5 flex items-center justify-center">
                                         {worker.photo_url ? (
                                             <img
-                                                src={`http://localhost:5000${worker.photo_url}`}
+                                                src={`${SERVER_URL}${worker.photo_url}`}
                                                 alt={worker.name}
                                                 className="h-full w-full object-cover"
                                                 onError={(e: any) => { e.target.style.display = 'none'; }}

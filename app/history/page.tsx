@@ -5,7 +5,7 @@ import {
     History as HistoryIcon, Search, Calendar, User, Download,
     FileSpreadsheet, Loader2, ArrowRight, ArrowUpRight, ArrowDownRight, Clock
 } from 'lucide-react';
-import { workersApi, reportsApi } from '@/lib/api';
+import { workersApi, reportsApi, SERVER_URL } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function HistoryPage() {
@@ -128,7 +128,7 @@ export default function HistoryPage() {
                                 <div className="flex items-center gap-6">
                                     <div className="h-20 w-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
                                         {selectedWorker.photo_url ? (
-                                            <img src={`http://localhost:5000${selectedWorker.photo_url}`} alt="P" className="h-full w-full object-cover" />
+                                            <img src={`${SERVER_URL}${selectedWorker.photo_url}`} alt="P" className="h-full w-full object-cover" />
                                         ) : (
                                             <User className="h-10 w-10 text-white/20" />
                                         )}
