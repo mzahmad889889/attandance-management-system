@@ -10,7 +10,7 @@ import { AttendanceChart } from '@/components/dashboard/attendance-chart';
 
 export default function ReportsPage() {
     const [summary, setSummary] = useState<any>(null);
-    const [meta, setMeta] = useState<{ plants: any[] }>({ plants: [] });
+    const [meta, setMeta] = useState<{ plants: any[]; contractors: any[] }>({ plants: [], contractors: [] });
     const [exporting, setExporting] = useState(false);
     const [dateFrom, setDateFrom] = useState(() => {
         const d = new Date();
@@ -18,22 +18,39 @@ export default function ReportsPage() {
     });
     const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
     const [plantId, setPlantId] = useState('');
+    const [contractorId, setContractorId] = useState('');
+    const [shift, setShift] = useState('');
 
     useEffect(() => {
         reportsApi.summary().then(setSummary).catch(() => { });
-        workersApi.meta().then((m: any) => setMeta({ plants: m.plants || [] })).catch(() => { });
+        workersApi.meta().then((m: any) => setMeta({
+            plants: m.plants || [],
+            contractors: m.contractors || [],
+        })).catch(() => { });
     }, []);
 
     const handleExport = async () => {
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            alert('From date cannot be later than To date.');
+            return;
+        }
+
         setExporting(true);
         try {
-            const res = await reportsApi.exportExcel({ date_from: dateFrom, date_to: dateTo, plant_id: plantId || undefined });
+            const res = await reportsApi.exportExcel({
+                date_from: dateFrom,
+                date_to: dateTo,
+                plant_id: plantId || undefined,
+                contractor_id: contractorId || undefined,
+                shift: shift || undefined,
+            });
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `attendance_${dateFrom}_to_${dateTo}.xlsx`;
             a.click();
+            URL.revokeObjectURL(url);
         } catch {
             alert('Export failed. Make sure the backend is running (python app.py).');
         } finally {
@@ -58,7 +75,7 @@ export default function ReportsPage() {
                     <FileSpreadsheet className="h-6 w-6 text-primary" />
                     <h3 className="text-xl font-bold text-primary">Excel Export Tool</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Date From</label>
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
@@ -79,12 +96,32 @@ export default function ReportsPage() {
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-end">
-                        <button onClick={handleExport} disabled={exporting}
-                            className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 shadow-lg shadow-primary/20">
-                            {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> Exporting...</> : <><Download className="h-4 w-4" /> Export Excel</>}
-                        </button>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Contractor</label>
+                        <select value={contractorId} onChange={e => setContractorId(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 outline-none focus:ring-2 ring-primary/30 text-sm appearance-none">
+                            <option value="">All Contractors</option>
+                            {meta.contractors.map((c: any) => (
+                                <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>
+                            ))}
+                        </select>
                     </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Shift</label>
+                        <select value={shift} onChange={e => setShift(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 outline-none focus:ring-2 ring-primary/30 text-sm appearance-none">
+                            <option value="">All Shifts</option>
+                            <option value="Day" className="bg-slate-900">Day</option>
+                            <option value="Night" className="bg-slate-900">Night</option>
+                            <option value="Rest" className="bg-slate-900">Rest</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="flex items-end justify-end">
+                    <button onClick={handleExport} disabled={exporting}
+                        className="w-full md:w-auto bg-primary text-white py-2.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 shadow-lg shadow-primary/20">
+                        {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> Exporting...</> : <><Download className="h-4 w-4" /> Export Excel</>}
+                    </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                     Exports attendance records with check-in/out times, total hours, overtime, and status for the selected date range.

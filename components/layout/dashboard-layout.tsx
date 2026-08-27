@@ -31,7 +31,7 @@ const sidebarItems = [
     { name: 'Face Check-In/Out', href: '/check-in', icon: ScanFace },
     { name: 'Worker History', href: '/history', icon: History },
     { name: 'Live Monitoring', href: '/monitoring', icon: Activity },
-    { name: 'Shift Management', href: '/shifts', icon: Factory },
+    // { name: 'Shift Management', href: '/shifts', icon: Factory },
     { name: 'Plants', href: '/plants', icon: Settings },
     { name: 'Reports', href: '/reports', icon: FileBox },
 ];
@@ -61,8 +61,8 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (va
                             <Factory className="text-white h-6 w-6" />
                         </div>
                         <div>
-                            <h1 className="font-bold text-lg leading-none">INDUSTRY</h1>
-                            <p className="text-[10px] text-muted-foreground tracking-widest font-semibold uppercase">Pro Management</p>
+                            <h1 className="font-bold text-lg leading-none">Dynea Pakistan</h1>
+                            <p className="text-[10px] text-muted-foreground tracking-widest font-semibold uppercase">Attendance System</p>
                         </div>
                     </div>
 

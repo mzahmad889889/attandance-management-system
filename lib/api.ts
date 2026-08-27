@@ -111,16 +111,37 @@ export const faceApi = {
 // ---- Reports ----
 export const reportsApi = {
     summary: () => request('/reports/summary'),
-    exportExcel: (params: Record<string, any> = {}) => {
+    exportExcel: async (params: Record<string, any> = {}) => {
         const token = getToken();
         const qs = new URLSearchParams(
             Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
         ).toString();
-        return fetch(`${BASE_URL}/reports/export-excel${qs ? '?' + qs : ''}`, {
+        const res = await fetch(`${BASE_URL}/reports/export-excel${qs ? '?' + qs : ''}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let message = 'Export failed.';
+            try {
+                const parsed = JSON.parse(text);
+                message = parsed.error || message;
+            } catch {
+                message = text || message;
+            }
+            throw new Error(message);
+        }
+
+        return res;
     },
-    workerHistory: (id: number) => request(`/reports/worker/${id}/history`),
+    workerHistory: (id: number, opts: { all?: boolean; days?: number } = {}) => {
+        const qs = new URLSearchParams(
+            Object.entries(opts)
+                .filter(([, v]) => v != null)
+                .map(([k, v]) => [k, String(v)])
+        ).toString();
+        return request(`/reports/worker/${id}/history${qs ? ('?' + qs) : ''}`);
+    },
     workerExport: (id: number) => requestBlob(`/reports/worker/${id}/export`),
     request: (endpoint: string, options?: RequestInit) => request(endpoint, options),
     requestBlob: (endpoint: string, options?: RequestInit) => requestBlob(endpoint, options),
@@ -131,6 +152,7 @@ export const plantsApi = {
     list: () => request('/plants/'),
     create: (data: any) => request('/plants/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request(`/plants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => request(`/plants/${id}`, { method: 'DELETE' }),
 };
 
 // ---- Shifts ----

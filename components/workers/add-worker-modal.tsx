@@ -13,14 +13,17 @@ import { faceApi } from '@/lib/api';
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (worker: any) => Promise<any>;
+    onAdd?: (worker: any) => Promise<any>;
+    onUpdate?: (id: number, worker: any) => Promise<any>;
+    worker?: any; // optional worker when editing
     meta: { plants: any[]; contractors: any[] };
 }
 
 const SCAN_INTERVAL_MS = 800;
 const TARGET_FRAMES = 8;
 
-export function AddWorkerModal({ isOpen, onClose, onAdd, meta }: Props) {
+export function AddWorkerModal(props: Props) {
+    const { isOpen, onClose, meta, onAdd, onUpdate, worker } = props;
     const webcamRef = useRef<Webcam>(null);
     const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -30,11 +33,36 @@ export function AddWorkerModal({ isOpen, onClose, onAdd, meta }: Props) {
     const [scanFrames, setScanFrames] = useState<string[]>([]);
     const [scanStatus, setScanStatus] = useState('');
     const [faceRegistered, setFaceRegistered] = useState(false);
-    const [formData, setFormData] = useState({
-        name: '', worker_code: '', plant_id: '', contractor_id: '', shift_type: 'Day',
+    const [formData, setFormData] = useState<{
+        name: string; worker_code: string; plant_id: string; contractor_id: string;
+        shift_type: string | null; age: string; cnic: string; phone: string;
+    }>({
+        name: '', worker_code: '', plant_id: '', contractor_id: '', shift_type: null,
         age: '', cnic: '', phone: '',
     });
+    // shiftMode: 'system' = omit shift (use system default), 'nil' = explicitly no shift, 'specify' = choose Day/Night/Rest
+    const [shiftMode, setShiftMode] = useState<'system'|'nil'|'specify'>('system');
     const [isSuccess, setIsSuccess] = useState(false);
+    // When editing an existing worker, populate the form
+    useEffect(() => {
+        if ((props as any)?.worker && isOpen) {
+            const w = (props as any).worker;
+            setFormData({
+                name: w.name || '',
+                worker_code: w.worker_code || '',
+                plant_id: String(w.plant_id || ''),
+                contractor_id: String(w.contractor_id || ''),
+                shift_type: w.shift_type || null,
+                age: w.age || '',
+                cnic: w.cnic || '',
+                phone: w.phone || '',
+            });
+            // derive shiftMode from worker.shift_type
+            if (w.shift_type === null || w.shift_type === undefined) setShiftMode('nil');
+            else if (w.shift_type) setShiftMode('specify');
+            else setShiftMode('system');
+        }
+    }, [isOpen]);
     const [submitting, setSubmitting] = useState(false);
     const [registeredWorkerId, setRegisteredWorkerId] = useState<number | null>(null);
 
@@ -94,14 +122,37 @@ export function AddWorkerModal({ isOpen, onClose, onAdd, meta }: Props) {
                 age: formData.age ? Number(formData.age) : null,
                 photo: capturedImg || undefined,
             };
+            // Handle shift selection behaviour:
+            // - 'system': omit shift_type so backend uses system default
+            // - 'nil': explicitly send null so worker has no assigned shift
+            // - 'specify': include selected shift_type (if any)
+            if (shiftMode === 'system') {
+                delete payload.shift_type;
+            } else if (shiftMode === 'nil') {
+                payload.shift_type = null;
+            } else if (shiftMode === 'specify') {
+                if (formData.shift_type) {
+                    payload.shift_type = formData.shift_type;
+                } else {
+                    // no specific shift chosen despite specifying — fallback to system default
+                    delete payload.shift_type;
+                }
+            }
 
-            // Create worker first
-            const res: any = await onAdd(payload) as any;
+            // Create or update
+            let res: any = null;
+            if (props.onUpdate && props.worker) {
+                // update
+                res = await props.onUpdate(props.worker.id, payload);
+            } else if (props.onAdd) {
+                res = await props.onAdd(payload);
+            }
 
             // If we have face frames and a worker ID from the backend, register face
-            if (scanFrames.length >= 2 && res?.worker?.id) {
+            const workerId = res?.worker?.id || (props.worker?.id ?? null);
+            if (scanFrames.length >= 2 && workerId) {
                 setScanStatus('Registering face embeddings...');
-                await faceApi.register(res.worker.id, scanFrames);
+                await faceApi.register(workerId, scanFrames);
                 setFaceRegistered(true);
             }
 
@@ -109,11 +160,12 @@ export function AddWorkerModal({ isOpen, onClose, onAdd, meta }: Props) {
             setTimeout(() => {
                 setIsSuccess(false);
                 onClose();
-                setFormData({ name: '', worker_code: '', plant_id: String(plants[0]?.id || ''), contractor_id: String(contractors[0]?.id || ''), shift_type: 'Day', age: '', cnic: '', phone: '' });
+                setFormData({ name: '', worker_code: '', plant_id: String(plants[0]?.id || ''), contractor_id: String(contractors[0]?.id || ''), shift_type: null, age: '', cnic: '', phone: '' });
+                setShiftMode('system');
                 setCapturedImg(null);
                 setScanFrames([]);
                 setShowCamera(false);
-            }, 1800);
+            }, 1200);
         } catch (err: any) {
             alert(err.message || 'Registration failed');
         } finally {
@@ -327,22 +379,46 @@ export function AddWorkerModal({ isOpen, onClose, onAdd, meta }: Props) {
                                                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
                                                         <Clock className="h-3 w-3" /> Default Shift
                                                     </label>
-                                                    <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-                                                        {['Day', 'Night', 'Rest'].map(type => (
-                                                            <button key={type} type="button"
-                                                                onClick={() => setFormData({ ...formData, shift_type: type })}
-                                                                className={cn(
-                                                                    "flex-1 py-2 rounded-lg text-[10px] font-bold transition-all",
-                                                                    formData.shift_type === type
-                                                                        ? "bg-primary text-white shadow-lg"
-                                                                        : "text-muted-foreground hover:bg-white/5"
-                                                                )}
-                                                            >
-                                                                {type.toUpperCase()}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
+
+                                                                                            <div className="flex items-center gap-3 mb-2">
+                                                                                                <label className="flex items-center gap-2 text-xs">
+                                                                                                    <input type="radio" name="shift_mode" checked={shiftMode === 'system'} onChange={e => { setShiftMode('system'); setFormData({ ...formData, shift_type: null }); }} className="w-4 h-4" />
+                                                                                                    <span className="text-[10px]">System default</span>
+                                                                                                </label>
+                                                                                                <label className="flex items-center gap-2 text-xs">
+                                                                                                    <input type="radio" name="shift_mode" checked={shiftMode === 'nil'} onChange={e => { setShiftMode('nil'); setFormData({ ...formData, shift_type: null }); }} className="w-4 h-4" />
+                                                                                                    <span className="text-[10px]">No shift (nil)</span>
+                                                                                                </label>
+                                                                                                <label className="flex items-center gap-2 text-xs">
+                                                                                                    <input type="radio" name="shift_mode" checked={shiftMode === 'specify'} onChange={e => { setShiftMode('specify'); if (!formData.shift_type) setFormData({ ...formData, shift_type: 'Day' }); }} className="w-4 h-4" />
+                                                                                                    <span className="text-[10px]">Specify shift</span>
+                                                                                                </label>
+                                                                                                {shiftMode === 'system' && (
+                                                                                                    <span className="text-[10px] text-muted-foreground">(will use system default)</span>
+                                                                                                )}
+                                                                                                {shiftMode === 'nil' && (
+                                                                                                    <span className="text-[10px] text-muted-foreground">(worker will have no assigned shift)</span>
+                                                                                                )}
+                                                                                            </div>
+
+                                                                                            <div className={cn("flex bg-white/5 p-1 rounded-xl border border-white/10", shiftMode !== 'specify' && 'opacity-50') }>
+                                                                                                {['Day', 'Night', 'Rest'].map(type => (
+                                                                                                    <button key={type} type="button"
+                                                                                                        onClick={() => setFormData({ ...formData, shift_type: formData.shift_type === type ? null : type })}
+                                                                                                        disabled={shiftMode !== 'specify'}
+                                                                                                        className={cn(
+                                                                                                            "flex-1 py-2 rounded-lg text-[10px] font-bold transition-all",
+                                                                                                            shiftMode === 'specify' && formData.shift_type === type
+                                                                                                                ? "bg-primary text-white shadow-lg"
+                                                                                                                : "text-muted-foreground hover:bg-white/5",
+                                                                                                            shiftMode !== 'specify' && "cursor-not-allowed"
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        {type.toUpperCase()}
+                                                                                                    </button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
                                             </div>
                                         </div>
 

@@ -43,7 +43,7 @@ export function LoginPage() {
                     <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-2xl shadow-primary/30 accent-glow">
                         <Factory className="h-9 w-9 text-white" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight">INDUSTRY PRO</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">DYNEA PAKISTAN</h1>
                     <p className="text-muted-foreground text-sm mt-1">Attendance Management System</p>
                 </div>
 

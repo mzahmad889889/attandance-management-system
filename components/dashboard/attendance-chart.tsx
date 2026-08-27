@@ -12,7 +12,9 @@ interface AttendanceChartProps {
 }
 
 export function AttendanceChart({ data }: AttendanceChartProps) {
-    const chartData = data && data.length > 0 ? data : ATTENDANCE_STATS;
+    const chartData = data && data.length > 0
+        ? data
+        : ATTENDANCE_STATS.map(({ name, present, absent }) => ({ day: name, present, absent }));
 
     return (
         <div className="glass-card p-6 rounded-2xl">
