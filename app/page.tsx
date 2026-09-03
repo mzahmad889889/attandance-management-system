@@ -4,10 +4,18 @@ import React, { useEffect, useState } from 'react';
 import {
   Users, UserCheck, UserPlus, Clock, Factory, Zap, ChevronRight, Activity, Download, Loader2
 } from 'lucide-react';
-import { StatCard } from '@/components/dashboard/stat-card';
+import { StatCard, StatTrend } from '@/components/dashboard/stat-card';
 import { AttendanceChart } from '@/components/dashboard/attendance-chart';
-import { PlantChart } from '@/components/dashboard/plant-chart';
+import { PlantChart, plantChartHeight } from '@/components/dashboard/plant-chart';
 import { attendanceApi, reportsApi, workersApi } from '@/lib/api';
+
+/** Change between the last two days of the weekly series, or nothing if both aren't there. */
+function dayOverDay(days: any[], key: 'present' | 'absent', upIsGood: boolean): StatTrend | undefined {
+  if (!days || days.length < 2) return undefined;
+  const today = days[days.length - 1];
+  const yesterday = days[days.length - 2];
+  return { delta: today[key] - yesterday[key], label: 'vs yesterday', upIsGood };
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -80,45 +88,55 @@ export default function DashboardPage() {
 
   const chartData = summary?.chart_data || [];
   const plantData = summary?.plant_breakdown || [];
+  // One height for both charts so the cards sit level however many plants there are.
+  const chartHeight = plantChartHeight(plantData.length);
+  const presentTrend = dayOverDay(chartData, 'present', true);
+  const absentTrend = dayOverDay(chartData, 'absent', false);
+  const presentPct = stats?.total_workers
+    ? Math.round((stats.present_today / stats.total_workers) * 100)
+    : null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Main Dashboard</h2>
-          <p className="text-muted-foreground">Industrial management overview for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
-        </div>
-        <div className="flex flex-col gap-3 xl:items-end">
-          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-2 w-fit">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Main Dashboard</h2>
+            <p className="text-muted-foreground">Industrial management overview for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+          </div>
+          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-2 shrink-0">
             <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-xs font-medium">System Live</span>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 w-full xl:max-w-[900px]">
-            <div className="space-y-1">
+        {/* Filters get a full-width row of their own so no control has to squeeze beside the title */}
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="grid flex-1 grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="space-y-1 min-w-0">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">From</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+                className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">To</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+                className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Plant</label>
               <select
                 value={plantId}
                 onChange={(e) => setPlantId(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+                className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
               >
                 <option value="">All Plants</option>
                 {meta.plants.map((plant: any) => (
@@ -126,12 +144,12 @@ export default function DashboardPage() {
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Contractor</label>
               <select
                 value={contractorId}
                 onChange={(e) => setContractorId(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+                className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
               >
                 <option value="">All Contractors</option>
                 {meta.contractors.map((contractor: any) => (
@@ -139,12 +157,12 @@ export default function DashboardPage() {
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Shift</label>
               <select
                 value={shift}
                 onChange={(e) => setShift(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+                className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
               >
                 <option value="">All Shifts</option>
                 <option value="Day">Day</option>
@@ -157,7 +175,7 @@ export default function DashboardPage() {
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-fit"
+            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
           >
             {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> Exporting...</> : <><Download className="h-4 w-4" /> Export Excel</>}
           </button>
@@ -169,36 +187,36 @@ export default function DashboardPage() {
         <StatCard
           title="Total Workers"
           value={loading ? '…' : (stats?.total_workers ?? '—')}
+          subValue="Active on the roster"
           icon={Users}
-          trend={{ value: 'Active Now', isUp: true }}
         />
         <StatCard
           title="Present Today"
           value={loading ? '…' : (stats?.present_today ?? '—')}
-          subValue={stats ? `/ ${stats.total_workers}` : ''}
+          subValue={stats ? `of ${stats.total_workers}${presentPct === null ? '' : ` · ${presentPct}%`}` : ''}
           icon={UserCheck}
-          trend={{ value: stats ? `${Math.round((stats.present_today / stats.total_workers) * 100)}%` : '—', isUp: true }}
-          color="green-500"
+          trend={presentTrend}
+          tone="green"
         />
         <StatCard
           title="Absent Workers"
           value={loading ? '…' : (stats?.absent_today ?? '—')}
+          subValue={stats ? `of ${stats.total_workers}` : ''}
           icon={UserPlus}
-          trend={{ value: 'Decrease', isUp: false }}
-          color="red-500"
+          trend={absentTrend}
+          tone="red"
         />
         <StatCard
           title="Overtime Hours"
           value={loading ? '…' : (stats?.total_overtime_hours?.toFixed(1) ?? '0')}
           subValue="Total today"
           icon={Clock}
-          trend={{ value: 'hrs', isUp: true }}
-          color="amber-500"
+          tone="amber"
         />
         <StatCard
           title="Active Plants"
-          value={plantData.length || 4}
-          subValue="All operational"
+          value={loading ? '…' : plantData.length}
+          subValue="Plants and departments"
           icon={Factory}
         />
         <StatCard
@@ -206,13 +224,13 @@ export default function DashboardPage() {
           value={loading ? '…' : (stats?.live_in ?? '—')}
           subValue="Real-time head count"
           icon={Activity}
-          color="blue-500"
+          tone="blue"
         />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <AttendanceChart data={chartData} />
+        <AttendanceChart data={chartData} height={chartHeight} />
         <PlantChart data={plantData} />
       </div>
 
