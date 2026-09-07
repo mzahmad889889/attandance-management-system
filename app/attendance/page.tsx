@@ -12,7 +12,8 @@ export default function AttendancePage() {
     const [records, setRecords] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [plantFilter, setPlantFilter] = useState('');
     const [shiftFilter, setShiftFilter] = useState('');
     const [page, setPage] = useState(1);
@@ -32,7 +33,8 @@ export default function AttendancePage() {
                 page,
                 per_page: 30,
                 search: searchTerm,
-                date: dateFilter,
+                date_from: dateFrom,
+                date_to: dateTo,
                 plant_id: plantFilter,
                 shift: shiftFilter,
             });
@@ -43,7 +45,7 @@ export default function AttendancePage() {
         } finally {
             setLoading(false);
         }
-    }, [page, searchTerm, dateFilter, plantFilter, shiftFilter]);
+    }, [page, searchTerm, dateFrom, dateTo, plantFilter, shiftFilter]);
 
     useEffect(() => {
         const t = setTimeout(fetchRecords, 300);
@@ -53,12 +55,16 @@ export default function AttendancePage() {
     const handleExport = async () => {
         setExporting(true);
         try {
-            const res = await reportsApi.exportExcel({ date_from: dateFilter, date_to: dateFilter, plant_id: plantFilter || undefined });
+            const res = await reportsApi.exportExcel({
+                date_from: dateFrom || undefined,
+                date_to: dateTo || undefined,
+                plant_id: plantFilter || undefined,
+            });
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `attendance_${dateFilter}.xlsx`;
+            a.download = `attendance_${dateFrom || 'all'}_${dateTo || 'records'}.xlsx`;
             a.click();
         } catch {
             alert('Export failed. Make sure the backend is running.');
@@ -72,7 +78,9 @@ export default function AttendancePage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">Attendance Logs</h2>
-                    <p className="text-muted-foreground">{total} records {dateFilter === new Date().toISOString().split('T')[0] ? 'today' : `on ${dateFilter}`}</p>
+                    <p className="text-muted-foreground">
+                        {total} records{dateFrom || dateTo ? ` from ${dateFrom || 'all time'} to ${dateTo || 'all time'}` : ' in retained history'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
@@ -83,12 +91,24 @@ export default function AttendancePage() {
                         <FileSpreadsheet className="h-4 w-4" />
                         {exporting ? 'Exporting...' : 'Export Excel'}
                     </button>
-                    <input
-                        type="date"
-                        value={dateFilter}
-                        onChange={e => { setDateFilter(e.target.value); setPage(1); }}
-                        className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 ring-primary/30"
-                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        From
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:ring-2 ring-primary/30"
+                        />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        To
+                        <input
+                            type="date"
+                            value={dateTo}
+                            onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:ring-2 ring-primary/30"
+                        />
+                    </label>
                 </div>
             </div>
 
@@ -155,7 +175,7 @@ export default function AttendancePage() {
                                 <tr>
                                     <td colSpan={7} className="px-6 py-16 text-center text-muted-foreground">
                                         <Clock className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                                        <p className="text-sm">No attendance records found for this date.</p>
+                                        <p className="text-sm">No attendance records found for this range.</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -187,21 +207,21 @@ export default function AttendancePage() {
                                             <div className="space-y-0.5">
                                                 <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-green-500">
                                                     <ArrowUpRight className="h-3 w-3" />
-                                                    {record.checkin_time || '--:--'}
+                                                    {record.checkin_date || record.date} {record.checkin_time || '--:--'}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-red-400">
                                                     <ArrowDownRight className="h-3 w-3" />
-                                                    {record.checkout_time || '--:--'}
+                                                    {record.checkout_date || record.date} {record.checkout_time || '--:--'}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-bold">{record.total_hours ? `${record.total_hours} hrs` : '—'}</p>
-                                            <p className="text-[10px] text-muted-foreground">of 12 hrs std</p>
+                                            <p className="text-[10px] text-muted-foreground">of 8 hrs std</p>
                                         </td>
                                         <td className="px-6 py-4">
                                             {record.overtime_hours > 0 ? (
-                                                <span className="text-primary font-bold text-sm">+{record.overtime_hours} hrs</span>
+                                                <span className="text-primary font-bold text-sm">+{record.overtime_hours} hrs ({record.overtime_minutes} min)</span>
                                             ) : (
                                                 <span className="text-muted-foreground text-xs">—</span>
                                             )}

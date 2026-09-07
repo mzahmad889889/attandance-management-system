@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Search, UserPlus, Filter, Trash2, RefreshCw, Tag, MapPin
+    Search, UserPlus, Filter, Trash2, RefreshCw, Tag, MapPin, Edit2
 } from 'lucide-react';
 import { workersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -11,12 +11,14 @@ import { AddWorkerModal } from '@/components/workers/add-worker-modal';
 export default function WorkersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingWorker, setEditingWorker] = useState<any | null>(null);
     const [workers, setWorkers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [plantFilter, setPlantFilter] = useState('');
+    const [contractorFilter, setContractorFilter] = useState('');
     const [shiftFilter, setShiftFilter] = useState('');
     const [meta, setMeta] = useState<{ plants: any[]; contractors: any[] }>({ plants: [], contractors: [] });
 
@@ -28,6 +30,7 @@ export default function WorkersPage() {
                 per_page: 24,
                 search: searchTerm,
                 plant_id: plantFilter,
+                contractor_id: contractorFilter,
                 shift: shiftFilter,
             });
             setWorkers(res.workers || []);
@@ -38,7 +41,7 @@ export default function WorkersPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, searchTerm, plantFilter, shiftFilter]);
+    }, [page, searchTerm, plantFilter, contractorFilter, shiftFilter]);
 
     useEffect(() => {
         workersApi.meta().then((m: any) => setMeta(m)).catch(() => { });
@@ -56,6 +59,16 @@ export default function WorkersPage() {
             return res; // Important: return the result so modal gets worker ID
         } catch (e: any) {
             throw e; // Modal handles the error UI
+        }
+    };
+
+    const handleUpdateWorker = async (id: number, data: any) => {
+        try {
+            const res = await workersApi.update(id, data);
+            fetchWorkers();
+            return res;
+        } catch (e: any) {
+            throw e;
         }
     };
 
@@ -79,8 +92,10 @@ export default function WorkersPage() {
         <div className="space-y-8 animate-in fade-in duration-500">
             <AddWorkerModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => { setIsModalOpen(false); setEditingWorker(null); }}
                 onAdd={handleAddWorker}
+                onUpdate={handleUpdateWorker}
+                worker={editingWorker}
                 meta={meta}
             />
 
@@ -132,6 +147,16 @@ export default function WorkersPage() {
                         <option value="Night" className="bg-slate-900">Night</option>
                         <option value="Rest" className="bg-slate-900">Rest</option>
                     </select>
+                    <select
+                        value={contractorFilter}
+                        onChange={e => { setContractorFilter(e.target.value); setPage(1); }}
+                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
+                    >
+                        <option value="">All Contractors</option>
+                        {meta.contractors.map((contractor: any) => (
+                            <option key={contractor.id} value={contractor.id} className="bg-slate-900">{contractor.name}</option>
+                        ))}
+                    </select>
                     <button onClick={fetchWorkers} className="p-2 border border-white/10 rounded-xl bg-white/5 hover:bg-white/10">
                         <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
                     </button>
@@ -174,13 +199,22 @@ export default function WorkersPage() {
                                         worker.live_status === 'IN' ? "bg-green-500" : "bg-slate-600"
                                     )} />
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteWorker(worker.id)}
-                                    className="p-2 hover:bg-red-500/10 rounded-full group/del transition-colors text-muted-foreground hover:text-red-500"
-                                    title="Delete Worker"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => { setEditingWorker(worker); setIsModalOpen(true); }}
+                                        className="p-2 hover:bg-white/5 rounded-full text-muted-foreground hover:text-white transition-colors"
+                                        title="Edit Worker"
+                                    >
+                                        <Edit2 className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteWorker(worker.id)}
+                                        className="p-2 hover:bg-red-500/10 rounded-full group/del transition-colors text-muted-foreground hover:text-red-500"
+                                        title="Delete Worker"
+                                    >
+                                        <Trash2 className="h-5 w-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             <h3 className="font-bold text-lg mb-0.5 truncate">{worker.name}</h3>
@@ -200,7 +234,7 @@ export default function WorkersPage() {
                                 <div className="flex items-center justify-between text-xs font-medium">
                                     <span className="text-muted-foreground">Shift</span>
                                     <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold", shiftColor(worker.shift_type))}>
-                                        {worker.shift_type?.toUpperCase()}
+                                        {worker.shift_type ? worker.shift_type.toUpperCase() : 'UNASSIGNED'}
                                     </span>
                                 </div>
                                 {worker.live_status === 'IN' && worker.checkin_time && (

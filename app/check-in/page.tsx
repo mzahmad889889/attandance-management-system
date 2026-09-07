@@ -183,7 +183,7 @@ export default function CheckInPage() {
                                                     <p className="font-bold leading-tight">{result.worker?.name}</p>
                                                     <p className="text-[11px] opacity-90">
                                                         {result.already_checked_in ? 'Already checked in' :
-                                                            result.not_checked_in ? 'Not checked in today' :
+                                                            result.not_checked_in ? 'No open check-in found' :
                                                                 `${mode === 'checkin' ? 'Check-In' : 'Check-Out'} successful`}
                                                         {' '}• {(result.confidence * 100).toFixed(1)}% match
                                                     </p>

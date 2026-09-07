@@ -14,6 +14,7 @@ export default function PlantsPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [newPlant, setNewPlant] = useState({ name: '', location: '', capacity: 90 });
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [editPlantData, setEditPlantData] = useState({ name: '', location: '', capacity: 90 });
 
     const fetchPlants = async () => {
         setLoading(true);
@@ -49,6 +50,16 @@ export default function PlantsPage() {
             fetchPlants();
         } catch (e: any) {
             alert(e.message);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!confirm('Delete this plant? This cannot be undone.')) return;
+        try {
+            await plantsApi.delete(id);
+            fetchPlants();
+        } catch (e: any) {
+            alert(e.message || 'Failed to delete plant');
         }
     };
 
@@ -134,61 +145,87 @@ export default function PlantsPage() {
                 )}
 
                 {plants.map((plant: any) => (
-                    <div key={plant.id} className="glass-card p-6 rounded-3xl border border-white/5 hover:border-primary/20 transition-all group overflow-hidden relative">
-                        {/* Status bar */}
-                        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary/50 to-blue-500/50" />
-
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
-                                    <Factory className="h-6 w-6 text-primary" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold">{plant.name}</h3>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <MapPin className="h-3 w-3" /> {plant.location || 'Location Not Set'}
-                                    </p>
+                    plant.id === editingId ? (
+                        <div key={plant.id} className="glass-card p-6 rounded-3xl border border-primary/30 bg-primary/5">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold">Edit Facility</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={() => { handleUpdate(plant.id, editPlantData); }} className="bg-primary text-white px-3 py-1 rounded-xl">Save</button>
+                                    <button onClick={() => setEditingId(null)} className="px-3 py-1 rounded-xl bg-white/5">Cancel</button>
                                 </div>
                             </div>
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setEditingId(plant.id)}
-                                    className="p-2 hover:bg-white/5 rounded-lg text-muted-foreground hover:text-white transition-colors"
-                                >
-                                    <Edit2 className="h-4 w-4" />
-                                </button>
-                                <button className="p-2 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors">
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="glass-card bg-white/5 p-4 rounded-2xl">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Total Workforce</p>
-                                <p className="text-2xl font-bold">{plant.total_workers || 0}</p>
-                            </div>
-                            <div className="glass-card bg-white/5 p-4 rounded-2xl">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Target Capacity</p>
-                                <p className="text-2xl font-bold">{plant.capacity}</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between items-end">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Utilization Rate</p>
-                                    <p className="text-[10px] font-bold text-primary">{plant.capacity ? Math.round((plant.total_workers / plant.capacity) * 100) : 0}%</p>
+                            <div className="space-y-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Plant Name</label>
+                                    <input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4" value={editPlantData.name} onChange={e => setEditPlantData({ ...editPlantData, name: e.target.value })} />
                                 </div>
-                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10 p-[1px]">
-                                    <div
-                                        className="h-full bg-primary rounded-full transition-all duration-1000"
-                                        style={{ width: `${plant.capacity ? Math.min(100, Math.round((plant.total_workers / plant.capacity) * 100)) : 0}%` }}
-                                    />
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Location</label>
+                                    <input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4" value={editPlantData.location} onChange={e => setEditPlantData({ ...editPlantData, location: e.target.value })} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Capacity</label>
+                                    <input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4" value={editPlantData.capacity} onChange={e => setEditPlantData({ ...editPlantData, capacity: Number(e.target.value) })} />
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div key={plant.id} className="glass-card p-6 rounded-3xl border border-white/5 hover:border-primary/20 transition-all group overflow-hidden relative">
+                            {/* Status bar */}
+                            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary/50 to-blue-500/50" />
+
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                                        <Factory className="h-6 w-6 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold">{plant.name}</h3>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" /> {plant.location || 'Location Not Set'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => { setEditingId(plant.id); setEditPlantData({ name: plant.name || '', location: plant.location || '', capacity: plant.capacity || 90 }); }}
+                                        className="p-2 hover:bg-white/5 rounded-lg text-muted-foreground hover:text-white transition-colors"
+                                    >
+                                        <Edit2 className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(plant.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="glass-card bg-white/5 p-4 rounded-2xl">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Total Workforce</p>
+                                    <p className="text-2xl font-bold">{plant.total_workers || 0}</p>
+                                </div>
+                                <div className="glass-card bg-white/5 p-4 rounded-2xl">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Target Capacity</p>
+                                    <p className="text-2xl font-bold">{plant.capacity}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-end">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Utilization Rate</p>
+                                        <p className="text-[10px] font-bold text-primary">{plant.capacity ? Math.round((plant.total_workers / plant.capacity) * 100) : 0}%</p>
+                                    </div>
+                                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10 p-[1px]">
+                                        <div
+                                            className="h-full bg-primary rounded-full transition-all duration-1000"
+                                            style={{ width: `${plant.capacity ? Math.min(100, Math.round((plant.total_workers / plant.capacity) * 100)) : 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
                 ))}
 
                 {loading && plants.length === 0 && Array.from({ length: 4 }).map((_, i) => (

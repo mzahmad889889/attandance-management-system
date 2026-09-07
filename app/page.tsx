@@ -2,28 +2,43 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Users, UserCheck, UserPlus, Clock, Factory, Zap, ChevronRight, Activity
+  Users, UserCheck, UserPlus, Clock, Factory, Zap, ChevronRight, Activity, Download, Loader2
 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { AttendanceChart } from '@/components/dashboard/attendance-chart';
 import { PlantChart } from '@/components/dashboard/plant-chart';
-import { attendanceApi, reportsApi } from '@/lib/api';
+import { attendanceApi, reportsApi, workersApi } from '@/lib/api';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [liveFeed, setLiveFeed] = useState<any[]>([]);
+  const [meta, setMeta] = useState<{ plants: any[]; contractors: any[] }>({ plants: [], contractors: [] });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
+  const [plantId, setPlantId] = useState('');
+  const [contractorId, setContractorId] = useState('');
+  const [shift, setShift] = useState('');
 
   useEffect(() => {
     Promise.all([
       attendanceApi.todayStats(),
       reportsApi.summary(),
       attendanceApi.liveFeed(),
-    ]).then(([s, sum, feed]: any[]) => {
+      workersApi.meta(),
+    ]).then(([s, sum, feed, workerMeta]: any[]) => {
       setStats(s);
       setSummary(sum);
       setLiveFeed(feed.records || []);
+      setMeta({
+        plants: workerMeta?.plants || [],
+        contractors: workerMeta?.contractors || [],
+      });
     }).catch(() => { }).finally(() => setLoading(false));
 
     // Refresh every 30 seconds
@@ -33,6 +48,35 @@ export default function DashboardPage() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleExport = async () => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      alert('From date cannot be later than To date.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const res = await reportsApi.exportExcel({
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        plant_id: plantId || undefined,
+        contractor_id: contractorId || undefined,
+        shift: shift || undefined,
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${dateFrom || 'all'}_to_${dateTo || 'all'}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Export failed – start the backend first');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const chartData = summary?.chart_data || [];
   const plantData = summary?.plant_breakdown || [];
@@ -44,23 +88,78 @@ export default function DashboardPage() {
           <h2 className="text-3xl font-bold tracking-tight">Main Dashboard</h2>
           <p className="text-muted-foreground">Industrial management overview for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-2">
+        <div className="flex flex-col gap-3 xl:items-end">
+          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-2 w-fit">
             <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-xs font-medium">System Live</span>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 w-full xl:max-w-[900px]">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Plant</label>
+              <select
+                value={plantId}
+                onChange={(e) => setPlantId(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+              >
+                <option value="">All Plants</option>
+                {meta.plants.map((plant: any) => (
+                  <option key={plant.id} value={plant.id}>{plant.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Contractor</label>
+              <select
+                value={contractorId}
+                onChange={(e) => setContractorId(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+              >
+                <option value="">All Contractors</option>
+                {meta.contractors.map((contractor: any) => (
+                  <option key={contractor.id} value={contractor.id}>{contractor.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Shift</label>
+              <select
+                value={shift}
+                onChange={(e) => setShift(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 outline-none focus:ring-2 ring-primary/30 text-sm"
+              >
+                <option value="">All Shifts</option>
+                <option value="Day">Day</option>
+                <option value="Night">Night</option>
+                <option value="Rest">Rest</option>
+              </select>
+            </div>
+          </div>
+
           <button
-            onClick={() => reportsApi.exportExcel().then(async r => {
-              const blob = await r.blob();
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'attendance_report.xlsx';
-              a.click();
-            }).catch(() => alert('Export failed – start the backend first'))}
-            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors"
+            onClick={handleExport}
+            disabled={exporting}
+            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-fit"
           >
-            Export Excel
+            {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> Exporting...</> : <><Download className="h-4 w-4" /> Export Excel</>}
           </button>
         </div>
       </div>
