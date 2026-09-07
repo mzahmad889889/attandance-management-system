@@ -18,6 +18,7 @@ export default function WorkersPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [plantFilter, setPlantFilter] = useState('');
+    const [contractorFilter, setContractorFilter] = useState('');
     const [shiftFilter, setShiftFilter] = useState('');
     const [meta, setMeta] = useState<{ plants: any[]; contractors: any[] }>({ plants: [], contractors: [] });
 
@@ -29,6 +30,7 @@ export default function WorkersPage() {
                 per_page: 24,
                 search: searchTerm,
                 plant_id: plantFilter,
+                contractor_id: contractorFilter,
                 shift: shiftFilter,
             });
             setWorkers(res.workers || []);
@@ -39,7 +41,7 @@ export default function WorkersPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, searchTerm, plantFilter, shiftFilter]);
+    }, [page, searchTerm, plantFilter, contractorFilter, shiftFilter]);
 
     useEffect(() => {
         workersApi.meta().then((m: any) => setMeta(m)).catch(() => { });
@@ -144,6 +146,16 @@ export default function WorkersPage() {
                         <option value="Day" className="bg-slate-900">Day</option>
                         <option value="Night" className="bg-slate-900">Night</option>
                         <option value="Rest" className="bg-slate-900">Rest</option>
+                    </select>
+                    <select
+                        value={contractorFilter}
+                        onChange={e => { setContractorFilter(e.target.value); setPage(1); }}
+                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
+                    >
+                        <option value="">All Contractors</option>
+                        {meta.contractors.map((contractor: any) => (
+                            <option key={contractor.id} value={contractor.id} className="bg-slate-900">{contractor.name}</option>
+                        ))}
                     </select>
                     <button onClick={fetchWorkers} className="p-2 border border-white/10 rounded-xl bg-white/5 hover:bg-white/10">
                         <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />

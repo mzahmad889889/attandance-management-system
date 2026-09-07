@@ -121,13 +121,13 @@ export function LoginPage() {
 
                     <div className="mt-6 pt-6 border-t border-white/5 text-center">
                         <p className="text-[10px] text-muted-foreground">
-                            Default credentials: <span className="text-primary font-mono">admin@system.com</span> / <span className="text-primary font-mono">admin123</span>
+                             <span className="text-primary font-mono"></span> <span className="text-primary font-mono"></span>
                         </p>
                     </div>
                 </div>
 
                 <p className="text-center text-muted-foreground/50 text-xs mt-6">
-                    © 2024 Industrial AMS — Powered by DeepFace AI
+© 2026 Dynea Pakistan Attendance System — All Rights Reserved | Designed & Developed by Muhammad Usama | usamashafi0011@gmail.com
                 </p>
             </motion.div>
         </div>

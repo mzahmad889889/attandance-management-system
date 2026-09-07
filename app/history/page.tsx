@@ -187,10 +187,10 @@ export default function HistoryPage() {
                                                     </td>
                                                     <td className="px-8 py-5 font-mono text-xs">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <ArrowUpRight className="h-3 w-3 text-green-500" /> {record.checkin_time || '--:--'}
+                                                            <ArrowUpRight className="h-3 w-3 text-green-500" /> {record.checkin_date || record.date} {record.checkin_time || '--:--'}
                                                         </div>
                                                         <div className="flex items-center gap-2 opacity-50">
-                                                            <ArrowDownRight className="h-3 w-3 text-red-400" /> {record.checkout_time || '--:--'}
+                                                            <ArrowDownRight className="h-3 w-3 text-red-400" /> {record.checkout_date || record.date} {record.checkout_time || '--:--'}
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-5">
@@ -198,7 +198,7 @@ export default function HistoryPage() {
                                                     </td>
                                                     <td className="px-8 py-5">
                                                         {record.overtime_hours > 0 ? (
-                                                            <span className="text-xs font-bold text-primary">+{record.overtime_hours}h</span>
+                                                            <span className="text-xs font-bold text-primary">+{record.overtime_hours}h ({record.overtime_minutes}m)</span>
                                                         ) : (
                                                             <span className="text-xs text-muted-foreground">—</span>
                                                         )}
