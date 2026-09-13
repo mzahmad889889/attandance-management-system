@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { faceApi, attendanceApi } from '@/lib/api';
+import { faceApi, attendanceApi, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Mode = 'checkin' | 'checkout';
@@ -20,7 +20,7 @@ export default function CheckInPage() {
     const [error, setError] = useState('');
     const [recentFeed, setRecentFeed] = useState<any[]>([]);
     const [isLive, setIsLive] = useState(false);
-    const liveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const liveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [engineStatus, setEngineStatus] = useState<'checking' | 'online' | 'offline'>('checking');
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -31,19 +31,51 @@ export default function CheckInPage() {
     }, []);
 
     useEffect(() => {
-        // Check AI engine status
-        faceApi.status().then((s: any) => {
-            setEngineStatus(s.available ? 'online' : 'offline');
-        }).catch(() => setEngineStatus('offline'));
+        // Check AI engine status. Just after a server restart the model is still loading, so
+        // keep checking instead of declaring the engine offline and disabling scanning for good.
+        let cancelled = false;
+        let retry: ReturnType<typeof setTimeout> | undefined;
+        const checkStatus = () => {
+            faceApi.status().then((s: any) => {
+                if (cancelled) return;
+                if (s.available) {
+                    setEngineStatus('online');
+                } else if (s.loading) {
+                    setEngineStatus('checking');
+                    retry = setTimeout(checkStatus, 5000);
+                } else {
+                    setEngineStatus('offline');
+                }
+            }).catch(() => {
+                if (cancelled) return;
+                setEngineStatus('offline');
+                retry = setTimeout(checkStatus, 10000);
+            });
+        };
+        checkStatus();
 
         // Load recent feed
         attendanceApi.liveFeed().then((f: any) => setRecentFeed(f.records || [])).catch(() => { });
+
+        return () => {
+            cancelled = true;
+            if (retry) clearTimeout(retry);
+        };
     }, []);
 
+    // True while a frame is on its way to the server. Live Mode used to post a frame every
+    // three seconds regardless, so a slow server built up a backlog of scans that occupied
+    // every server thread and stalled the entire API, logins included. Refs rather than state,
+    // because the scan loop would otherwise read values captured when it started.
+    const inFlightRef = useRef(false);
+    const isLiveRef = useRef(isLive);
+
     const capture = useCallback(async () => {
+        if (inFlightRef.current) return;
         const img = webcamRef.current?.getScreenshot();
         if (!img) { setError('Could not capture frame from camera.'); return; }
 
+        inFlightRef.current = true;
         setProcessing(true);
         setResult(null);
         setError('');
@@ -56,20 +88,35 @@ export default function CheckInPage() {
                 attendanceApi.liveFeed().then((f: any) => setRecentFeed(f.records || [])).catch(() => { });
             }
         } catch (e: any) {
-            setError(e.message || 'Recognition failed');
+            // 429 and 503 mean the scanner is busy or still starting. Live Mode just tries again
+            // on its next cycle, so only a manual scan needs to show the message.
+            const retryable = e instanceof ApiError && (e.status === 429 || e.status === 503);
+            if (!(retryable && isLiveRef.current)) setError(e.message || 'Recognition failed');
         } finally {
+            inFlightRef.current = false;
             setProcessing(false);
         }
     }, [mode]);
 
-    // Auto-scan every 3 seconds when live mode is on
+    // Live Mode: scan, then wait three seconds after the result before scanning again.
+    // Scheduling each scan from the end of the previous one, instead of on a fixed interval,
+    // keeps a kiosk to a single frame in flight however slow recognition becomes.
     useEffect(() => {
-        if (isLive) {
-            liveTimerRef.current = setInterval(capture, 3000);
-        } else {
-            if (liveTimerRef.current) clearInterval(liveTimerRef.current);
-        }
-        return () => { if (liveTimerRef.current) clearInterval(liveTimerRef.current); };
+        isLiveRef.current = isLive;
+        if (!isLive) return;
+
+        let stopped = false;
+        const loop = async () => {
+            if (stopped) return;
+            await capture();
+            if (!stopped) liveTimerRef.current = setTimeout(loop, 3000);
+        };
+        loop();
+
+        return () => {
+            stopped = true;
+            if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
+        };
     }, [isLive, capture]);
 
     return (

@@ -19,6 +19,17 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 
 export type RequestOptions = RequestInit & { timeoutMs?: number };
 
+/** An HTTP error response. Carries the status so callers can tell "busy, retry" from "broken". */
+export class ApiError extends Error {
+    readonly status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+    }
+}
+
 function getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('ams_token');
@@ -62,7 +73,7 @@ async function request<T = any>(
             const errJson = await res.json();
             errMsg = errJson.error || errMsg;
         } catch (_) { }
-        throw new Error(errMsg);
+        throw new ApiError(errMsg, res.status);
     }
 
     // Handle file downloads
@@ -86,7 +97,7 @@ async function requestBlob(endpoint: string, options: RequestOptions = {}): Prom
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetchWithTimeout(`${BASE_URL}${endpoint}`, { timeoutMs: 60_000, ...options, headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
     return res.blob();
 }
 
